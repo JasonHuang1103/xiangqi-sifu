@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xiangqi-sifu"
+version = "0.1.0"
+description = "Phase 1 MVP for personal Xiangqi game review."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+frontend = ["streamlit>=1.30"]
+
+[project.scripts]
+xiangqi-sifu = "xiangqi_sifu.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

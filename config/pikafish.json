@@ -1,0 +1,10 @@
+{
+  "engine": "pikafish",
+  "protocol": "uci",
+  "source": "https://github.com/official-pikafish/Pikafish",
+  "release": "Pikafish-2026-01-02",
+  "binaryPath": "engines/pikafish-2026-01-02/MacOS/pikafish-apple-silicon",
+  "workingDirectory": "engines/pikafish-2026-01-02",
+  "evalFile": "engines/pikafish-2026-01-02/pikafish.nnue",
+  "launchMode": "subprocess"
+}

@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: xiangqi-sifu
+Version: 0.1.0
+Summary: Phase 1 MVP for personal Xiangqi game review.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Provides-Extra: frontend
+Requires-Dist: streamlit>=1.30; extra == "frontend"
+
 # xiangqi-sifu
 
 `xiangqi-sifu` is a Phase 1 MVP for personal Xiangqi game review. It ingests one game at a time, normalizes coordinate moves, generates FEN positions, runs engine-style analysis, detects evaluation-loss mistakes, stores results in SQLite, and renders a Markdown review report.
@@ -158,31 +169,6 @@ The app lets you upload or paste one ICCS/PGN-like game, choose `mock` or a Pika
 7. Store game, positions, moves, evaluations, and mistakes in SQLite.
 8. Render a Markdown report with metadata, move list, eval timeline, mistake table, and explanation stubs.
 
-## Bulk Game Parsing
-
-The source database file `WXF-41743games.pgns` stores all games in one text file. Games are separated by:
-
-```text
-[Game "Chinese Chess"]
-```
-
-Parse it into one structured JSONL record per game:
-
-```bash
-PYTHONPATH=src python3 scripts/import_games.py \
-  --source WXF-41743games.pgns \
-  --output-dir data/processed/wxf_41743games
-```
-
-Outputs:
-
-```text
-data/processed/wxf_41743games/games.jsonl
-data/processed/wxf_41743games/manifest.json
-```
-
-Each JSONL row contains `game_id`, metadata, players, result, starting FEN, move count, and normalized moves with ICCS plus UCI coordinates. Generated processed data is ignored by git because it is large and reproducible from the source file.
-
 ## Thresholds
 
 Default centipawn-loss thresholds:
@@ -214,7 +200,6 @@ Moves are not flagged when the engine best move matches the played move.
 - [x] Run 3 Streamlit upload/review UI.
 - [x] Run 3 move list, evaluation timeline, mistake table, and report display.
 - [x] Run 3 frontend orchestration tests without requiring Streamlit in unit tests.
-- [x] Bulk parser for `WXF-41743games.pgns` into per-game JSONL records.
 
 ## To Do
 

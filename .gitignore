@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+engines/
+*.pgns
+*.db
+*.sqlite
+data/processed/*.md
+data/processed/*.json
+data/processed/*.sqlite
+data/processed/*.db
+data/processed/**/*.jsonl
+data/processed/**/manifest.json
