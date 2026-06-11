@@ -2,13 +2,23 @@ from __future__ import annotations
 
 import json
 
-from xiangqi_sifu.coach.explanation import explain_mistake
+from xiangqi_sifu.coach.explanation import (
+    ExplanationProvider,
+    VerifiedExplanation,
+    build_verified_explanations,
+    explain_mistake,
+)
 from xiangqi_sifu.coach.mistake_detector import Mistake
 from xiangqi_sifu.engine.analysis import AnalysisResult
 from xiangqi_sifu.parsers.base import ParsedMove
 
 
-def render_markdown_report(analysis: AnalysisResult, mistakes: list[Mistake]) -> str:
+def render_markdown_report(
+    analysis: AnalysisResult,
+    mistakes: list[Mistake],
+    explanation_provider: ExplanationProvider | None = None,
+    verified_explanations: list[VerifiedExplanation] | None = None,
+) -> str:
     game = analysis.game
     title = _game_title(game.red, game.black)
     lines = [
@@ -88,6 +98,25 @@ def render_markdown_report(analysis: AnalysisResult, mistakes: list[Mistake]) ->
             )
     else:
         lines.append("- No mistakes crossed the configured threshold.")
+
+    if verified_explanations is None and explanation_provider is not None:
+        verified_explanations = build_verified_explanations(
+            analysis,
+            mistakes,
+            explanation_provider,
+        )
+
+    if verified_explanations is not None:
+        lines.extend(["", "## Verified Explanations", ""])
+        if verified_explanations:
+            for verified in verified_explanations:
+                sample = verified.sample
+                lines.append(
+                    f"- Move {sample.move_number}: {verified.candidate.text} "
+                    f"Status: {verified.status}. Confidence: {verified.confidence}."
+                )
+        else:
+            lines.append("- No explanation candidates generated.")
     lines.append("")
     return "\n".join(lines)
 

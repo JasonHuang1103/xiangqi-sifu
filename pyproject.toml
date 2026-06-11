@@ -13,6 +13,14 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 frontend = ["streamlit>=1.30"]
+training = [
+    "accelerate>=1.5",
+    "datasets>=3.4",
+    "peft>=0.15",
+    "tensorboard>=2.19",
+    "torch>=2.5",
+    "transformers>=4.50",
+]
 
 [project.scripts]
 xiangqi-sifu = "xiangqi_sifu.cli:main"

@@ -1,0 +1,21 @@
+{
+  "base_model_id": "Qwen/Qwen3.5-2B",
+  "model_family": "qwen3_5_image_text_to_text",
+  "dataset_path": "data/training/explanations/train.jsonl",
+  "validation_path": "data/training/explanations/validation.jsonl",
+  "output_dir": "models/xiangqi-sifu-qwen35-2b-lora",
+  "max_length": 512,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.1,
+  "target_modules": "all-linear",
+  "per_device_train_batch_size": 1,
+  "gradient_accumulation_steps": 16,
+  "learning_rate": 0.0001,
+  "num_train_epochs": 2,
+  "max_steps": null,
+  "save_steps": 200,
+  "logging_steps": 10,
+  "bf16": true,
+  "gradient_checkpointing": true
+}

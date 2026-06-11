@@ -53,3 +53,16 @@ create table if not exists mistakes (
     eval_after_cp integer not null,
     eval_loss_cp integer not null
 );
+
+create table if not exists explanations (
+    id integer primary key autoincrement,
+    game_id integer not null references games(id) on delete cascade,
+    ply integer not null,
+    move_number integer not null,
+    side text not null,
+    provider text not null,
+    status text not null,
+    confidence text not null,
+    explanation_text text not null,
+    notes_json text not null
+);

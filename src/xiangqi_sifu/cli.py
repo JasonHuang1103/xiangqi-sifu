@@ -3,6 +3,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from xiangqi_sifu.coach.explanation import (
+    StaticExplanationProvider,
+    XiangqiR1LocalProvider,
+    build_verified_explanations,
+)
 from xiangqi_sifu.coach.mistake_detector import MistakeThresholds, detect_mistakes
 from xiangqi_sifu.coach.report import render_markdown_report
 from xiangqi_sifu.config import load_config
@@ -33,6 +38,14 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--report", type=Path, help="Optional Markdown report output path")
     analyze.add_argument("--depth", type=int, default=8, help="Search depth for real Pikafish analysis")
     analyze.add_argument("--movetime-ms", type=int, help="Optional movetime per position; overrides depth")
+    analyze.add_argument(
+        "--explain",
+        choices=["none", "mock", "xiangqi-r1"],
+        default="none",
+        help="Optional explanation provider for mistake summaries",
+    )
+    analyze.add_argument("--xiangqi-r1-model", help="Base model path/name for local Xiangqi-R1 inference")
+    analyze.add_argument("--xiangqi-r1-lora", help="LoRA adapter path for local Xiangqi-R1 inference")
     analyze.add_argument("--inaccuracy-cp", type=int, default=80)
     analyze.add_argument("--mistake-cp", type=int, default=150)
     analyze.add_argument("--blunder-cp", type=int, default=300)
@@ -57,8 +70,22 @@ def analyze_command(args: argparse.Namespace) -> int:
             blunder_cp=args.blunder_cp,
         ),
     )
-    game_id = AnalysisRepository(args.db).save_analysis(analysis, mistakes)
-    report = render_markdown_report(analysis, mistakes)
+    explanation_provider = _build_explanation_provider(args)
+    verified_explanations = (
+        build_verified_explanations(analysis, mistakes, explanation_provider)
+        if explanation_provider is not None
+        else None
+    )
+    game_id = AnalysisRepository(args.db).save_analysis(
+        analysis,
+        mistakes,
+        verified_explanations=verified_explanations,
+    )
+    report = render_markdown_report(
+        analysis,
+        mistakes,
+        verified_explanations=verified_explanations,
+    )
     report = f"<!-- saved_game_id: {game_id} -->\n\n{report}"
 
     if args.report:
@@ -86,6 +113,23 @@ def _build_engine(args: argparse.Namespace):
         depth=args.depth,
         movetime_ms=args.movetime_ms,
     )
+
+
+def _build_explanation_provider(args: argparse.Namespace):
+    if args.explain == "none":
+        return None
+    if args.explain == "mock":
+        return StaticExplanationProvider()
+    if args.explain == "xiangqi-r1":
+        if not args.xiangqi_r1_model or not args.xiangqi_r1_lora:
+            raise SystemExit(
+                "--explain xiangqi-r1 requires --xiangqi-r1-model and --xiangqi-r1-lora"
+            )
+        return XiangqiR1LocalProvider(
+            model_path=args.xiangqi_r1_model,
+            lora_path=args.xiangqi_r1_lora,
+        )
+    raise ValueError(f"Unsupported explanation provider: {args.explain!r}")
 
 
 if __name__ == "__main__":

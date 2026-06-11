@@ -7,7 +7,7 @@ from xiangqi_sifu.parsers.wxf_bulk_parser import write_games_jsonl
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Parse WXF-41743games.pgns into one JSONL record per game.")
+    parser = argparse.ArgumentParser(description="Parse a Xiangqi .pgns corpus into one JSONL record per game.")
     parser.add_argument(
         "--source",
         type=Path,

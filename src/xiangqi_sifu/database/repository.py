@@ -4,6 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
+from xiangqi_sifu.coach.explanation import VerifiedExplanation
 from xiangqi_sifu.coach.mistake_detector import Mistake
 from xiangqi_sifu.engine.analysis import AnalysisResult
 
@@ -14,7 +15,12 @@ class AnalysisRepository:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
-    def save_analysis(self, analysis: AnalysisResult, mistakes: list[Mistake]) -> int:
+    def save_analysis(
+        self,
+        analysis: AnalysisResult,
+        mistakes: list[Mistake],
+        verified_explanations: list[VerifiedExplanation] | None = None,
+    ) -> int:
         game = analysis.game
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("pragma foreign_keys = on")
@@ -108,6 +114,29 @@ class AnalysisRepository:
                         mistake.eval_loss_cp,
                     )
                     for mistake in mistakes
+                ],
+            )
+            conn.executemany(
+                """
+                insert into explanations (
+                    game_id, ply, move_number, side, provider, status, confidence,
+                    explanation_text, notes_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        game_id,
+                        explanation.sample.ply,
+                        explanation.sample.move_number,
+                        explanation.sample.side,
+                        explanation.candidate.provider,
+                        explanation.status,
+                        explanation.confidence,
+                        explanation.candidate.text,
+                        json.dumps(list(explanation.notes), ensure_ascii=False),
+                    )
+                    for explanation in (verified_explanations or [])
                 ],
             )
             return game_id

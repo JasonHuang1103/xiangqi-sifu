@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from xiangqi_sifu.coach.explanation import (
+    StaticExplanationProvider,
+    XiangqiR1LocalProvider,
+    build_verified_explanations,
+)
 from xiangqi_sifu.coach.mistake_detector import MistakeThresholds, detect_mistakes
 from xiangqi_sifu.coach.report import build_move_impact_rows, render_markdown_report
 from xiangqi_sifu.database.repository import AnalysisRepository
@@ -20,6 +25,7 @@ class ReviewViewModel:
     eval_rows: list[dict[str, Any]]
     impact_rows: list[dict[str, Any]]
     mistake_rows: list[dict[str, Any]]
+    explanation_rows: list[dict[str, Any]]
     report_markdown: str
 
 
@@ -35,6 +41,10 @@ def run_review_from_text(
     depth: int,
     movetime_ms: int | None = None,
     thresholds: MistakeThresholds | None = None,
+    explanation_provider: str = "none",
+    lora_model_path: str | None = None,
+    lora_adapter_path: str | None = None,
+    explanation_max_new_tokens: int = 192,
 ) -> ReviewViewModel:
     game = _parse_game_text(game_text)
     engine = _build_engine(engine_value, depth=depth, movetime_ms=movetime_ms)
@@ -46,8 +56,27 @@ def run_review_from_text(
             close()
 
     mistakes = detect_mistakes(game.moves, analysis.evaluations, thresholds or MistakeThresholds())
-    game_id = AnalysisRepository(db_path).save_analysis(analysis, mistakes)
-    report = render_markdown_report(analysis, mistakes)
+    provider = _build_explanation_provider(
+        explanation_provider,
+        lora_model_path=lora_model_path,
+        lora_adapter_path=lora_adapter_path,
+        max_new_tokens=explanation_max_new_tokens,
+    )
+    verified_explanations = (
+        build_verified_explanations(analysis, mistakes, provider)
+        if provider is not None
+        else None
+    )
+    game_id = AnalysisRepository(db_path).save_analysis(
+        analysis,
+        mistakes,
+        verified_explanations=verified_explanations,
+    )
+    report = render_markdown_report(
+        analysis,
+        mistakes,
+        verified_explanations=verified_explanations,
+    )
     impact_rows = build_move_impact_rows(analysis)
     return ReviewViewModel(
         game_id=game_id,
@@ -82,6 +111,19 @@ def run_review_from_text(
             }
             for mistake in mistakes
         ],
+        explanation_rows=[
+            {
+                "move": explanation.sample.move_number,
+                "side": explanation.sample.side,
+                "played": explanation.sample.played_move,
+                "best_move": explanation.sample.best_move,
+                "provider": explanation.candidate.provider,
+                "status": explanation.status,
+                "confidence": explanation.confidence,
+                "text": explanation.candidate.text,
+            }
+            for explanation in (verified_explanations or [])
+        ],
         report_markdown=f"<!-- saved_game_id: {game_id} -->\n\n{report}",
     )
 
@@ -112,6 +154,30 @@ def main() -> None:
         inaccuracy_cp = st.number_input("Inaccuracy cp", min_value=1, value=80, step=10)
         mistake_cp = st.number_input("Mistake cp", min_value=1, value=150, step=10)
         blunder_cp = st.number_input("Blunder cp", min_value=1, value=300, step=10)
+        explanation_provider = st.selectbox(
+            "Explanations",
+            options=["none", "mock", "xiangqi-r1"],
+            index=0,
+            help="Use mock for deterministic local checks, or xiangqi-r1 for the local LoRA adapter.",
+        )
+        lora_model_path = st.text_input(
+            "LoRA base model",
+            value="models/base/Qwen3.5-2B",
+            disabled=explanation_provider != "xiangqi-r1",
+        )
+        lora_adapter_path = st.text_input(
+            "LoRA adapter",
+            value="models/xiangqi-sifu-qwen35-2b-lora",
+            disabled=explanation_provider != "xiangqi-r1",
+        )
+        explanation_max_new_tokens = st.number_input(
+            "Explanation max tokens",
+            min_value=32,
+            max_value=512,
+            value=192,
+            step=32,
+            disabled=explanation_provider != "xiangqi-r1",
+        )
 
     uploaded_file = st.file_uploader("Upload a Xiangqi game", type=["txt", "pgn", "pgns"])
     sample_text = Path("data/examples/simple_game.txt").read_text(encoding="utf-8")
@@ -141,6 +207,10 @@ def main() -> None:
                     mistake_cp=int(mistake_cp),
                     blunder_cp=int(blunder_cp),
                 ),
+                explanation_provider=explanation_provider,
+                lora_model_path=lora_model_path,
+                lora_adapter_path=lora_adapter_path,
+                explanation_max_new_tokens=int(explanation_max_new_tokens),
             )
         _render_review(st, review)
 
@@ -157,6 +227,28 @@ def _build_engine(engine_value: str, *, depth: int, movetime_ms: int | None):
     return PikafishEngine(engine_value, depth=depth, movetime_ms=movetime_ms)
 
 
+def _build_explanation_provider(
+    provider_value: str,
+    *,
+    lora_model_path: str | None,
+    lora_adapter_path: str | None,
+    max_new_tokens: int,
+):
+    if provider_value == "none":
+        return None
+    if provider_value == "mock":
+        return StaticExplanationProvider()
+    if provider_value == "xiangqi-r1":
+        if not lora_model_path or not lora_adapter_path:
+            raise ValueError("xiangqi-r1 explanations require model and adapter paths")
+        return XiangqiR1LocalProvider(
+            model_path=lora_model_path,
+            lora_path=lora_adapter_path,
+            max_new_tokens=max_new_tokens,
+        )
+    raise ValueError(f"Unsupported explanation provider: {provider_value!r}")
+
+
 def _render_review(st, review: ReviewViewModel) -> None:
     st.success(f"Analysis saved as game #{review.game_id}.")
     metrics = st.columns(3)
@@ -164,8 +256,8 @@ def _render_review(st, review: ReviewViewModel) -> None:
     metrics[1].metric("Evaluations", len(review.eval_rows))
     metrics[2].metric("Mistakes", len(review.mistake_rows))
 
-    tab_moves, tab_eval, tab_impact, tab_mistakes, tab_report = st.tabs(
-        ["Move List", "Position Eval", "Move Impact", "Mistakes", "Markdown Report"]
+    tab_moves, tab_eval, tab_impact, tab_mistakes, tab_explanations, tab_report = st.tabs(
+        ["Move List", "Position Eval", "Move Impact", "Mistakes", "Explanations", "Markdown Report"]
     )
     with tab_moves:
         st.dataframe(review.move_rows, use_container_width=True, hide_index=True)
@@ -181,6 +273,11 @@ def _render_review(st, review: ReviewViewModel) -> None:
             st.dataframe(review.mistake_rows, use_container_width=True, hide_index=True)
         else:
             st.info("No moves crossed the configured mistake thresholds.")
+    with tab_explanations:
+        if review.explanation_rows:
+            st.dataframe(review.explanation_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No verified explanations were generated.")
     with tab_report:
         st.markdown(review.report_markdown)
         st.download_button(
