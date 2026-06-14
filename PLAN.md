@@ -667,6 +667,350 @@ User improves over time
 
 ---
 
+# Side Quest / Phase 3.5 — Screenshot-to-FEN Board Vision
+
+**Timeline:** Parallel side quest; independent from AI coach training.
+
+## Goal
+
+Convert Xiangqi board screenshots into reliable FEN positions that can feed the existing engine, knowledge-base, and explanation pipelines.
+
+This is a separate but repo-aligned computer-vision track. It should stay inside Xiangqi-Sifu rather than becoming a separate project because it reuses:
+
+```text
+FEN representation
+
+board/state validation
+
+Pikafish analysis
+
+knowledge-base lookup
+
+future UI/reporting workflows
+```
+
+The side quest is useful for:
+
+```text
+human verification of board states
+
+faster game/move recording
+
+before/after move detection
+
+future interactive computer-player automation
+```
+
+## Architecture
+
+```text
+screenshot
+    ↓
+board detector
+    ↓
+grid mapper
+    ↓
+piece detector / classifier
+    ↓
+orientation resolver
+    ↓
+FEN generator
+    ↓
+human verification
+    ↓
+Pikafish / knowledge base / explanation pipeline
+```
+
+The model or classifier should not be responsible for Xiangqi reasoning. Its job is only:
+
+```text
+What piece, if any, is on this grid intersection?
+```
+
+The existing Xiangqi-Sifu pipeline should handle:
+
+```text
+piece grid
+    ↓
+FEN
+    ↓
+engine analysis
+    ↓
+knowledge lookup
+    ↓
+explanation / report
+```
+
+## MVP Constraints
+
+- [x] Support verified board-label input as the first deterministic path.
+- [ ] Input is a clean full-board screenshot.
+- [ ] Board is clearly visible, with no animation blur.
+- [ ] Board uses the standard 9x10 Xiangqi grid.
+- [ ] Red and Black sides must be detected.
+- [ ] Orientation is inferred from `帥/帅` and `將/将`.
+- [ ] Piece type is inferred from color and visible root character.
+- [ ] Output includes FEN plus confidence scores.
+- [ ] Low-confidence results require manual correction.
+- [ ] Continuous screen monitoring is out of scope for the first milestone.
+- [ ] Vision-model or LoRA training is optional, not mandatory.
+
+Current implementation status:
+
+- [x] Isolated `src/xiangqi_sifu/vision/` package.
+- [x] Board rectangle/grid coordinate mapping.
+- [x] Verified piece-label JSON to FEN.
+- [x] Template-based `.png` / `.jpg` screenshot to FEN.
+- [x] Manual board rectangle support for screenshot mode.
+- [x] Template manifest support for image-mode piece recognition.
+- [x] FEN validation through the existing FEN parser.
+- [x] King-based orientation resolver.
+- [x] Before/after verified board-label move inference.
+- [x] Before/after screenshot move inference using the same template recognizer.
+- [x] `scripts/screenshot_to_fen.py` CLI for labelled board observations.
+- [x] `scripts/compare_screenshots.py` CLI for before/after labelled board observations.
+- [x] `scripts/screenshot_to_fen.py` CLI for raw screenshot plus templates.
+- [x] `scripts/compare_screenshots.py` CLI for before/after raw screenshots plus templates.
+- [x] Screenshot crop extraction around the 90 grid intersections.
+- [ ] Automatic board rectangle detection.
+- [ ] Continuous screen monitoring.
+
+## Recommended Repo Shape
+
+```text
+src/xiangqi_sifu/vision/
+    board_detector.py
+    grid_mapper.py
+    piece_classifier.py
+    fen_from_image.py
+    move_from_screenshots.py
+
+scripts/
+    screenshot_to_fen.py
+    compare_screenshots.py
+
+data/vision/
+    samples/
+    labels/
+    templates/
+```
+
+## Milestones
+
+### 3.5A — Manual Screenshot-to-FEN
+
+Goal:
+
+```text
+Given one clean screenshot, output a valid FEN.
+```
+
+Tasks:
+
+- [x] Load a verified board-label JSON file from local disk.
+- [x] Load a screenshot from local disk.
+- [x] Manually specify the board rectangle.
+- [x] Normalize the board to a 9x10 grid.
+- [x] Crop the 90 grid intersections.
+- [x] Detect occupied intersections with template matching.
+- [x] Read each occupied intersection from verified labels.
+- [x] Infer board orientation from `帥/帅` and `將/将`.
+- [x] Generate Xiangqi FEN.
+- [x] Validate the generated FEN with the existing FEN parser.
+- [x] Output confidence scores and uncertain squares.
+
+Success criteria:
+
+```text
+Clean screenshot
+    ↓
+valid FEN
+    ↓
+optional Pikafish analysis
+```
+
+### 3.5B — Before/After Move Detection
+
+Goal:
+
+```text
+Given two board screenshots, infer the played move.
+```
+
+Tasks:
+
+- [x] Convert the before verified labels or screenshot to a board grid.
+- [x] Convert the after verified labels or screenshot to a board grid.
+- [x] Compare changed occupied intersections.
+- [x] Infer source square and destination square.
+- [x] Produce UCI/ICCS-style move notation.
+- [ ] Apply the move to the before FEN.
+- [ ] Confirm the resulting FEN matches the after screenshot-derived FEN.
+- [ ] Reject ambiguous changes unless a human confirms them.
+
+Success criteria:
+
+```text
+before screenshot
+after screenshot
+    ↓
+played move
+    ↓
+validated after-position FEN
+```
+
+### 3.5C — Human Verification Tool
+
+Goal:
+
+```text
+Let a user verify or correct screenshot-derived board states.
+```
+
+Tasks:
+
+- [ ] Display original screenshot.
+- [ ] Display generated board state.
+- [ ] Display generated FEN.
+- [ ] Highlight low-confidence or ambiguous squares.
+- [ ] Allow user correction of piece type, color, or empty square.
+- [ ] Save corrected labels for future classifier/template improvement.
+- [ ] Store screenshot metadata, generated FEN, corrected FEN, and confidence report.
+
+Success criteria:
+
+```text
+AI vision output
+    ↓
+human correction
+    ↓
+verified FEN
+    ↓
+labeled training/evaluation sample
+```
+
+### 3.5D — Continuous Board Monitor
+
+Goal:
+
+```text
+Watch a screen region and keep the current Xiangqi position updated.
+```
+
+This should only begin after screenshot-to-FEN and before/after move detection are reliable.
+
+Tasks:
+
+- [ ] Let user define a screen region.
+- [ ] Periodically capture that region.
+- [ ] Detect board-state changes.
+- [ ] Ignore animation/transient frames.
+- [ ] Infer moves over time.
+- [ ] Maintain current FEN.
+- [ ] Send current FEN to Pikafish on demand.
+- [ ] Support pause/resume and manual correction.
+
+Success criteria:
+
+```text
+screen region
+    ↓
+detected board changes
+    ↓
+move stream
+    ↓
+current FEN
+    ↓
+engine recommendation / analysis
+```
+
+### 3.5E — Optional Vision Model / LoRA Track
+
+Goal:
+
+```text
+Improve recognition only if deterministic/template/classifier methods are insufficient.
+```
+
+Default approach:
+
+```text
+template matching or lightweight image classifier first
+```
+
+Optional training path:
+
+- [ ] Collect verified piece crops from the human verification tool.
+- [ ] Label crops by color and piece type.
+- [ ] Train a lightweight image classifier for piece recognition.
+- [ ] Evaluate accuracy by board theme and screenshot source.
+- [ ] Consider a vision-language LoRA adapter only if direct classification is not reliable enough.
+
+Success criteria:
+
+```text
+verified labels
+    ↓
+trained recognizer
+    ↓
+better screenshot-to-FEN accuracy
+```
+
+## Deliverables
+
+- [x] Screenshot-to-FEN CLI for verified board-label inputs and template-based screenshots.
+- [x] Before/after comparison CLI for verified board labels and template-based screenshots.
+- [x] Vision test fixtures.
+- [x] Labeled sample dataset.
+- [x] Confidence and error report.
+- [ ] Human correction workflow.
+- [ ] Optional classifier training notes.
+- [ ] Integration path into CLI/UI analysis.
+
+## Success Criteria
+
+```text
+Given a clean board screenshot
+
+↓
+
+System outputs a valid FEN
+
+↓
+
+User can verify or correct the board state
+
+↓
+
+The FEN can be passed to Pikafish and the knowledge DB
+```
+
+For before/after screenshots:
+
+```text
+before position
+
+after position
+
+↓
+
+system infers the move when confidence is high
+
+↓
+
+human reviews ambiguous cases
+```
+
+## Non-Goals For MVP
+
+- [ ] No fully autonomous online-board playing.
+- [ ] No screen monitoring before static screenshot recognition works.
+- [ ] No mandatory LoRA or vision-language model training.
+- [ ] No attempt to support every board theme before the first working prototype.
+- [ ] No unsupported tactical explanation from screenshots alone.
+
+---
+
 # Phase 4 — Research / Publication Version
 
 **Timeline:** 1–6 months

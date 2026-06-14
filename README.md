@@ -22,6 +22,7 @@ xiangqi-sifu/
 |-- data/
 |   |-- raw/
 |   |-- processed/
+|   |-- vision/
 |   `-- examples/
 |-- engine/
 |   `-- README.md
@@ -52,6 +53,13 @@ xiangqi-sifu/
 |       |   |-- repository.py
 |       |   `-- builder.py
 |       |-- training/
+|       |-- vision/
+|       |   |-- board_detector.py
+|       |   |-- grid_mapper.py
+|       |   |-- piece_classifier.py
+|       |   |-- fen_from_image.py
+|       |   |-- orientation.py
+|       |   `-- move_from_screenshots.py
 |       |-- coach/
 |       |   |-- mistake_detector.py
 |       |   |-- explanation.py
@@ -61,10 +69,14 @@ xiangqi-sifu/
 |           `-- routes.py
 |-- frontend/
 |   `-- streamlit_app.py
+|-- side_projects/
+|   `-- pikafish_mate_finder/
 |-- scripts/
 |   |-- import_games.py
 |   |-- build_knowledge_base.py
 |   |-- query_knowledge_base.py
+|   |-- screenshot_to_fen.py
+|   |-- compare_screenshots.py
 |   |-- train_lora.py
 |   `-- evaluate_explanation_benchmark.py
 |-- tests/
@@ -96,6 +108,12 @@ Install the training extra only when preparing or running LoRA fine-tuning:
 
 ```bash
 pip install -e ".[training]"
+```
+
+Install the vision extra when using raw screenshot-to-FEN recognition:
+
+```bash
+pip install -e ".[vision]"
 ```
 
 If using the system Python on this machine, disable third-party pytest plugin autoload because a global plugin currently imports an incompatible `pydantic_core` wheel:
@@ -328,6 +346,64 @@ PYTHONPATH=src python3 scripts/query_knowledge_base.py \
 
 Each JSONL row contains `game_id`, metadata, players, result, starting FEN, move count, and normalized moves with ICCS plus UCI coordinates. Generated processed data is ignored by git because it is large and reproducible from the source file.
 
+## Phase 3.5 Board Vision
+
+Phase 3.5 starts with a deterministic, human-verifiable board-vision path. It supports verified board-label JSON and template-based `.png` / `.jpg` screenshot recognition with a manual board rectangle. It does not yet auto-detect the board rectangle or support arbitrary board themes without templates.
+
+Convert a labelled board observation to FEN:
+
+```bash
+PYTHONPATH=src python3 scripts/screenshot_to_fen.py \
+  --labels data/vision/samples/starting_position_labels.json
+```
+
+Infer a move from before/after labelled board observations:
+
+```bash
+PYTHONPATH=src python3 scripts/compare_screenshots.py \
+  --before-labels data/vision/samples/starting_position_labels.json \
+  --after-labels data/vision/samples/after_h2e2_labels.json
+```
+
+Recognize a raw screenshot with templates:
+
+```bash
+PYTHONPATH=src python3 scripts/screenshot_to_fen.py \
+  --image path/to/board.png \
+  --templates path/to/templates \
+  --board-rect 10,10,160,180 \
+  --active-color w
+```
+
+Template directories must contain a `manifest.json` mapping FEN piece letters to image files:
+
+```json
+{
+  "templates": {
+    "K": "red_king.png",
+    "k": "black_king.png"
+  }
+}
+```
+
+Label files use Xiangqi board coordinates as keys and FEN piece letters as values. Uppercase pieces are Red, lowercase pieces are Black.
+
+## Side Project: Pikafish Mate Finder
+
+`side_projects/pikafish_mate_finder` is a separable side project that accepts a Xiangqi board screenshot, converts it to FEN with template matching, and asks Pikafish whether the searched line reports `score mate`.
+
+```bash
+PYTHONPATH=. .venv/bin/python \
+  side_projects/pikafish_mate_finder/scripts/find_mate.py \
+  --image path/to/board.png \
+  --templates path/to/templates \
+  --board-rect 10,10,160,180 \
+  --engine engines/pikafish-2026-01-02/MacOS/pikafish-apple-silicon \
+  --depth 12
+```
+
+See `side_projects/pikafish_mate_finder/README.md` for the standalone usage contract.
+
 ## Thresholds
 
 Default centipawn-loss thresholds:
@@ -377,6 +453,10 @@ Moves are not flagged when the engine best move matches the played move.
 - [x] Phase 3A build/query scripts for opening explorer backend.
 - [x] Phase 3A mixed-source sample build from WXF and dpxq processed games.
 - [x] Phase 3A full WXF+dpxq public knowledge database build.
+- [x] Phase 3.5 isolated vision package for verified board-label to FEN conversion.
+- [x] Phase 3.5 before/after verified board-label move inference.
+- [x] Phase 3.5 template-based raw screenshot to FEN conversion.
+- [x] Phase 3.5 before/after raw screenshot move inference.
 
 ## To Do
 
@@ -384,12 +464,16 @@ Moves are not flagged when the engine best move matches the played move.
 - [ ] Phase 1.5: Expand beyond the 450-record MVP slice with more diverse human-reviewed explanations.
 - [ ] Phase 2: Add a human-rated explanation quality benchmark.
 - [ ] Phase 3B: Connect analyzed user mistakes to the knowledge base for recurring-pattern reports.
+- [ ] Phase 3.5: Add automatic board rectangle detection.
+- [ ] Phase 3.5: Add human correction UI for low-confidence vision results.
+- [ ] Phase 3.5: Add continuous board monitor after static screenshot recognition is reliable.
 - [ ] Later: Add deeper tactical/theme verification beyond simple text support checks.
 
 ## Current Limitations
 
 - FEN generation applies moves but does not validate full Xiangqi legality.
 - Only one-game-at-a-time analysis is in scope.
+- Phase 3.5 raw screenshot recognition requires a manual board rectangle and a template manifest.
 - The full public knowledge database is a generated local artifact; rebuild it from `data/raw` if it is deleted or moved.
 - Real Xiangqi-R1 inference is optional and requires local model resources outside the default install.
 - Explanation verification is conservative and does not yet prove tactical claims such as material wins or mating attacks.
