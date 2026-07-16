@@ -18,3 +18,4 @@ data/training/**/*.json
 models/
 output/
 logs/
+.superpowers/
