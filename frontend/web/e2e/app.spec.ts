@@ -14,6 +14,7 @@ test("launchpad contains every named activity and no board", async ({ page }) =>
 
 
 test("friend move persists and can be resumed after reload", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
   await page.goto("/");
   await page.getByRole("button", { name: "Play a Friend" }).click();
   const dialog = page.getByRole("dialog", { name: "Play a Friend" });
@@ -21,9 +22,17 @@ test("friend move persists and can be resumed after reload", async ({ page }) =>
   await dialog.getByLabel("Black player").fill("Lin");
   await dialog.getByRole("button", { name: "Play a Friend" }).click();
 
+  const boardBeforeMove = await page.locator(".board-frame").boundingBox();
   await page.getByTestId("square-h2").click();
   await page.getByTestId("square-e2").click();
   await expect(page.getByText("BLACK TO MOVE")).toBeVisible();
+  await expect(page.getByTestId("last-move-origin-h2")).toBeVisible();
+  await expect(page.getByTestId("last-move-destination-e2")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+  const boardAfterMove = await page.locator(".board-frame").boundingBox();
+  expect(boardBeforeMove).not.toBeNull();
+  expect(boardAfterMove?.x).toBeCloseTo(boardBeforeMove!.x, 1);
+  expect(boardAfterMove?.y).toBeCloseTo(boardBeforeMove!.y, 1);
 
   await page.reload();
   await page.getByRole("button", { name: /Mei — Lin.*Continue/ }).click();
@@ -33,12 +42,19 @@ test("friend move persists and can be resumed after reload", async ({ page }) =>
 
 
 test("position analysis exposes metadata and grounded chat", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
   await page.getByRole("button", { name: "Analyze a Position" }).click();
   await page.getByRole("button", { name: "Confirm and analyze" }).click();
 
   await expect(page.getByRole("region", { name: "Position analysis" })).toBeVisible();
   await expect(page.getByText("h2e2", { exact: true })).toBeVisible();
+  const boardWithAnalysis = await page.locator(".board-frame").boundingBox();
+  await page.getByRole("button", { name: "Analysis on" }).click();
+  const boardWithoutAnalysis = await page.locator(".board-frame").boundingBox();
+  expect(boardWithAnalysis).not.toBeNull();
+  expect(boardWithoutAnalysis?.x).toBeCloseTo(boardWithAnalysis!.x, 1);
+  expect(boardWithoutAnalysis?.y).toBeCloseTo(boardWithAnalysis!.y, 1);
   await page.getByRole("button", { name: "Show the threat" }).click();
   await expect(page.getByText(/Pikafish's first choice is `h2e2`/)).toBeVisible();
 });

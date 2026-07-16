@@ -34,4 +34,6 @@ test("plays a highlighted server-authoritative move", async () => {
 
   await waitFor(() => expect(screen.getByText("BLACK TO MOVE")).toBeInTheDocument());
   expect(fetch).toHaveBeenCalledWith("/api/play/games/7/moves", expect.objectContaining({ method: "POST" }));
+  expect(screen.getByTestId("last-move-origin-h2")).toBeInTheDocument();
+  expect(screen.getByTestId("last-move-destination-e2")).toBeInTheDocument();
 });

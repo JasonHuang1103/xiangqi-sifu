@@ -43,11 +43,42 @@ test("analysis toggle never removes the coaching panel", async () => {
   );
 
   expect(screen.getByText("+1.3")).toBeInTheDocument();
+  expect(screen.getByTestId("analysis-slot")).toBeInTheDocument();
   expect(screen.getByRole("complementary", { name: "Ask Sifu" })).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Analysis on" }));
 
-  expect(screen.queryByText("+1.3")).not.toBeInTheDocument();
+  expect(screen.getByTestId("analysis-slot")).toHaveClass("analysis-slot-hidden");
+  expect(screen.getByTestId("analysis-slot")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByText("+1.3")).toBeInTheDocument();
   expect(screen.getByRole("complementary", { name: "Ask Sifu" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Analysis off" })).toBeInTheDocument();
+});
+
+
+test("review navigation traces the move that produced the selected position", () => {
+  render(
+    <Workspace
+      title="Central Cannon"
+      game={{
+        ...game,
+        pieces: { e0: "K", e9: "k", e2: "C" },
+        moves: [
+          { id: 1, ply: 1, uci: "h2e2", resulting_fen: "after-one" },
+          { id: 2, ply: 2, uci: "h7e7", resulting_fen: "after-two" },
+        ],
+      }}
+      selectedPly={1}
+      positions={[
+        { ply: 0, fen: "start", played_move: null, lines: [] },
+        { ply: 1, fen: "after-one", played_move: "h2e2", lines: [] },
+        { ply: 2, fen: "after-two", played_move: "h7e7", lines: [] },
+      ]}
+      onNavigate={() => undefined}
+      onExit={() => undefined}
+    />,
+  );
+
+  expect(screen.getByTestId("last-move-origin-h2")).toBeInTheDocument();
+  expect(screen.getByTestId("last-move-destination-e2")).toBeInTheDocument();
 });

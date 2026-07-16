@@ -9,6 +9,7 @@ const glyphs: Record<string, string> = {
 interface XiangqiBoardProps {
   pieces: PieceMap;
   bestMove?: string | null;
+  lastMove?: string | null;
   showAnalysis?: boolean;
   flipped?: boolean;
   selectedSquare?: string | null;
@@ -28,6 +29,7 @@ function point(square: string, flipped: boolean) {
 export function XiangqiBoard({
   pieces,
   bestMove = null,
+  lastMove = null,
   showAnalysis = false,
   flipped = false,
   selectedSquare = null,
@@ -36,6 +38,14 @@ export function XiangqiBoard({
 }: XiangqiBoardProps) {
   const arrow = bestMove && bestMove.length === 4
     ? { from: point(bestMove.slice(0, 2), flipped), to: point(bestMove.slice(2), flipped) }
+    : null;
+  const trace = lastMove && lastMove.length === 4
+    ? {
+        fromSquare: lastMove.slice(0, 2),
+        toSquare: lastMove.slice(2),
+        from: point(lastMove.slice(0, 2), flipped),
+        to: point(lastMove.slice(2), flipped),
+      }
     : null;
   return (
     <div className="board-frame">
@@ -65,6 +75,12 @@ export function XiangqiBoard({
           const position = point(square, flipped);
           return <circle key={`hit-${square}`} data-testid={`square-${square}`} className="square-hit" cx={position.x} cy={position.y} r="19" onClick={() => onSquareClick?.(square)} />;
         })}
+        {trace && (
+          <g className="last-move-trace" pointerEvents="none">
+            <circle data-testid={`last-move-origin-${trace.fromSquare}`} className="last-move-origin" cx={trace.from.x} cy={trace.from.y} r="18" />
+            <circle data-testid={`last-move-destination-${trace.toSquare}`} className="last-move-destination" cx={trace.to.x} cy={trace.to.y} r="21" />
+          </g>
+        )}
         {legalTargets.map((square) => {
           const target = point(square, flipped);
           return <circle key={`target-${square}`} className="legal-target" cx={target.x} cy={target.y} r="7" />;
