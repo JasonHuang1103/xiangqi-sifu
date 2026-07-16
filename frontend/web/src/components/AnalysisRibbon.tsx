@@ -3,7 +3,7 @@ import type { AnalysisView } from "../app/types";
 
 function score(value: number | null) {
   if (value === null) return "—";
-  const normalized = value / 100;
+  const normalized = Math.abs(value) < 5 ? 0 : value / 100;
   return `${normalized > 0 ? "+" : ""}${normalized.toFixed(1)}`;
 }
 

@@ -25,6 +25,7 @@ class GameAnalysisRequest(BaseModel):
     starting_fen: str
     moves: list[str]
     multipv: int = Field(default=1, ge=1, le=5)
+    selected_ply: int | None = Field(default=None, ge=0)
 
 
 class RecordInspectRequest(BaseModel):

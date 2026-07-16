@@ -58,6 +58,23 @@ def test_selected_game_can_be_analyzed_move_by_move(tmp_path):
     assert response.json()["positions"][1]["played_move"] == "h2e2"
 
 
+def test_game_review_can_analyze_only_the_selected_ply(tmp_path):
+    api = client(tmp_path)
+
+    response = api.post(
+        "/api/analysis/games",
+        json={
+            "starting_fen": DEFAULT_START_FEN,
+            "moves": ["h2e2", "b9c7"],
+            "multipv": 1,
+            "selected_ply": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert [len(row["lines"]) for row in response.json()["positions"]] == [0, 1, 0]
+
+
 def test_friend_game_move_is_legal_and_persisted(tmp_path):
     api = client(tmp_path)
     created = api.post("/api/play/games", json={"mode": "friend"}).json()

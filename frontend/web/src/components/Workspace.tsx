@@ -1,8 +1,9 @@
 import { useState } from "react";
 
-import type { AnalysisView, CoachMessage, GameView } from "../app/types";
+import type { AnalysisView, AnalyzedPosition, CoachMessage, GameView } from "../app/types";
 import { AnalysisRibbon } from "./AnalysisRibbon";
 import { CoachPanel } from "./CoachPanel";
+import { EvaluationChart } from "./EvaluationChart";
 import { XiangqiBoard } from "./XiangqiBoard";
 
 interface WorkspaceProps {
@@ -13,10 +14,13 @@ interface WorkspaceProps {
   onExit: () => void;
   onMove?: (uci: string) => void;
   onAsk?: (question: string) => Promise<void> | void;
+  selectedPly?: number;
+  onNavigate?: (ply: number) => void;
+  positions?: AnalyzedPosition[];
 }
 
 
-export function Workspace({ title, game, analysis = null, messages = [], onExit, onAsk }: WorkspaceProps) {
+export function Workspace({ title, game, analysis = null, messages = [], onExit, onAsk, selectedPly = game.moves.length, onNavigate, positions }: WorkspaceProps) {
   const [analysisVisible, setAnalysisVisible] = useState(Boolean(analysis));
   const [flipped, setFlipped] = useState(false);
   return (
@@ -35,7 +39,7 @@ export function Workspace({ title, game, analysis = null, messages = [], onExit,
           <header className="board-heading"><div><p className="section-kicker">{game.mode === "friend" ? "FRIENDLY MATCH" : "POSITION ANALYSIS"}</p><h1>{title}</h1></div><div className="board-tools"><button type="button" onClick={() => setFlipped((value) => !value)}>Flip</button>{analysis && <button type="button" className={analysisVisible ? "active" : ""} onClick={() => setAnalysisVisible((value) => !value)}>{analysisVisible ? "Analysis on" : "Analysis off"}</button>}<button type="button">Edit</button><button type="button" onClick={onExit}>New</button></div></header>
           {analysis && analysisVisible && <AnalysisRibbon analysis={analysis} />}
           <div className="board-stage"><div className="turn-label"><span className={game.side_to_move} /> {game.side_to_move.toUpperCase()} TO MOVE</div><XiangqiBoard pieces={game.pieces} bestMove={analysis?.bestMove} showAnalysis={analysisVisible} flipped={flipped} /></div>
-          <footer className="move-footer"><button type="button" aria-label="First move">|‹</button><button type="button" aria-label="Previous move">‹</button><div className="move-track"><i style={{ width: `${Math.min(100, game.moves.length * 4)}%` }} /></div><span>{game.moves.length} moves</span><button type="button" aria-label="Next move">›</button><button type="button" aria-label="Last move">›|</button></footer>
+          <div>{positions && positions.length > 1 && onNavigate && <EvaluationChart positions={positions} selectedPly={selectedPly} onSelect={onNavigate} />}<footer className="move-footer"><button type="button" aria-label="First move" onClick={() => onNavigate?.(0)} disabled={!onNavigate || selectedPly === 0}>|‹</button><button type="button" aria-label="Previous move" onClick={() => onNavigate?.(selectedPly - 1)} disabled={!onNavigate || selectedPly === 0}>‹</button><div className="move-track"><i style={{ width: `${game.moves.length ? Math.round(selectedPly / game.moves.length * 100) : 0}%` }} /></div><span>{selectedPly} / {game.moves.length} moves</span><button type="button" aria-label="Next move" onClick={() => onNavigate?.(selectedPly + 1)} disabled={!onNavigate || selectedPly >= game.moves.length}>›</button><button type="button" aria-label="Last move" onClick={() => onNavigate?.(game.moves.length)} disabled={!onNavigate || selectedPly >= game.moves.length}>›|</button></footer></div>
         </section>
         <CoachPanel messages={messages} onSend={onAsk} />
       </div>

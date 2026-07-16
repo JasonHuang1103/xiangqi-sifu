@@ -90,6 +90,8 @@ def analyze_game_positions(
             positions.append((board, move.lower()))
     except (IllegalMoveError, ValueError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    if request.selected_ply is not None and request.selected_ply >= len(positions):
+        raise HTTPException(status_code=422, detail="selected_ply is outside the game")
 
     rows = []
     for ply, (position_board, played_move) in enumerate(positions):
@@ -98,7 +100,11 @@ def analyze_game_positions(
             fen=position_board.to_fen(),
             side_to_move="red" if position_board.active_color == "w" else "black",
         )
-        lines = services.engine.analyze_lines(position, multipv=request.multipv)
+        lines = (
+            services.engine.analyze_lines(position, multipv=request.multipv)
+            if request.selected_ply is None or request.selected_ply == ply
+            else ()
+        )
         rows.append(
             {
                 "ply": ply,

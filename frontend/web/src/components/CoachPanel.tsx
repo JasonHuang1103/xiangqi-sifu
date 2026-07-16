@@ -25,7 +25,7 @@ export function CoachPanel({ messages = [], onSend }: CoachPanelProps) {
           <div className="coach-welcome"><p className="section-kicker">COACHING CONVERSATION</p><h3>Look first.<br />Then ask why.</h3><p>Ask about the best move, compare two ideas, or request a simpler explanation.</p></div>
         ) : messages.map((message, index) => <div key={index} className={`coach-message ${message.role}`}>{message.content}</div>)}
       </div>
-      <div className="coach-prompts"><button type="button">Show the threat</button><button type="button">Compare lines</button><button type="button">Explain simply</button></div>
+      <div className="coach-prompts"><button type="button" onClick={() => onSend?.("What is the immediate threat?")} disabled={!onSend}>Show the threat</button><button type="button" onClick={() => onSend?.("Compare the best candidate lines.")} disabled={!onSend}>Compare lines</button><button type="button" onClick={() => onSend?.("Explain the position simply.")} disabled={!onSend}>Explain simply</button></div>
       <form className="coach-compose" onSubmit={submit}><label className="sr-only" htmlFor="coach-question">Ask about this position</label><input id="coach-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about this position…" disabled={!onSend} /><button type="submit" disabled={!onSend || !question.trim()}>Send</button></form>
     </aside>
   );
