@@ -56,6 +56,25 @@ def test_pikafish_engine_converts_black_to_move_score_to_red_perspective(tmp_pat
     assert evaluation.best_move == "b9c7"
 
 
+def test_pikafish_engine_returns_ordered_multipv_metadata(tmp_path):
+    fake_engine = _write_fake_multipv_engine(tmp_path)
+    position = Position(ply=0, fen=START_FEN, side_to_move="red")
+
+    engine = PikafishEngine(fake_engine, depth=12)
+    try:
+        lines = engine.analyze_lines(position, multipv=3)
+    finally:
+        engine.close()
+
+    assert [line.multipv for line in lines] == [1, 2, 3]
+    assert [line.best_move for line in lines] == ["h2e2", "h0g2", "b2e2"]
+    assert [line.red_score_cp for line in lines] == [80, 45, None]
+    assert lines[2].mate_score == 5
+    assert lines[0].depth == 12
+    assert lines[0].nodes == 1200
+    assert lines[0].pv == ("h2e2", "b9c7")
+
+
 def _write_fake_uci_engine(tmp_path, score_cp, best_move):
     script = tmp_path / "fake_uci_engine.py"
     script.write_text(
@@ -75,6 +94,38 @@ for raw in sys.stdin:
     elif command.startswith("go "):
         print("info depth 1 score cp {score_cp} pv h2e2 b9c7")
         print("bestmove {best_move}")
+        sys.stdout.flush()
+    elif command == "quit":
+        break
+""",
+        encoding="utf-8",
+    )
+    script.chmod(script.stat().st_mode | os.X_OK)
+    return script
+
+
+def _write_fake_multipv_engine(tmp_path):
+    script = tmp_path / "fake_multipv_engine.py"
+    script.write_text(
+        f"""#!{sys.executable}
+import sys
+
+for raw in sys.stdin:
+    command = raw.strip()
+    if command == "uci":
+        print("id name Fake MultiPV Pikafish")
+        print("option name MultiPV type spin default 1 min 1 max 10")
+        print("uciok")
+        sys.stdout.flush()
+    elif command == "isready":
+        print("readyok")
+        sys.stdout.flush()
+    elif command.startswith("go "):
+        print("info depth 10 multipv 1 score cp 70 nodes 900 pv h2e2 b9c7")
+        print("info depth 12 multipv 2 score cp 45 nodes 1100 pv h0g2 b9c7")
+        print("info depth 12 multipv 1 score cp 80 nodes 1200 pv h2e2 b9c7")
+        print("info depth 12 multipv 3 score mate 5 nodes 1000 pv b2e2 b9c7")
+        print("bestmove h2e2")
         sys.stdout.flush()
     elif command == "quit":
         break

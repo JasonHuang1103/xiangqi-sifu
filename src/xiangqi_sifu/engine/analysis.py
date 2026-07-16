@@ -16,6 +16,8 @@ class Evaluation:
     best_move: str | None = None
     mate_score: int | None = None
     pv: tuple[str, ...] = field(default_factory=tuple)
+    depth: int | None = None
+    nodes: int | None = None
 
 
 @dataclass(frozen=True)

@@ -6,12 +6,16 @@ import sys
 import time
 from pathlib import Path
 
+from xiangqi_sifu.analysis.models import EngineLine
 from xiangqi_sifu.board.representation import Position
 from xiangqi_sifu.engine.analysis import Evaluation
 
 SCORE_CP_RE = re.compile(r"\bscore cp (-?\d+)")
 SCORE_MATE_RE = re.compile(r"\bscore mate (-?\d+)")
 PV_RE = re.compile(r"\bpv\s+(.+)$")
+DEPTH_RE = re.compile(r"\bdepth (\d+)")
+NODES_RE = re.compile(r"\bnodes (\d+)")
+MULTIPV_RE = re.compile(r"\bmultipv (\d+)")
 
 
 class UciProtocolError(RuntimeError):
@@ -42,20 +46,29 @@ class PikafishEngine:
         self._process: subprocess.Popen[str] | None = None
 
     def analyze(self, position: Position) -> Evaluation:
-        self._ensure_started()
-        self._send(f"position fen {position.fen}")
-        self._send(_go_command(self.depth, self.movetime_ms))
-        lines = self._read_until("bestmove", self.command_timeout)
-        raw_score_cp, raw_mate_score, best_move, pv = _parse_analysis_lines(lines)
-        red_to_move = position.side_to_move == "red"
+        lines = self.analyze_lines(position, multipv=1)
+        line = lines[0] if lines else EngineLine(1, None, None, None)
         return Evaluation(
             ply=position.ply,
             fen=position.fen,
-            red_score_cp=_to_red_score(raw_score_cp, red_to_move),
-            mate_score=_to_red_score(raw_mate_score, red_to_move),
-            best_move=None if best_move == "(none)" else best_move,
-            pv=tuple(pv),
+            red_score_cp=line.red_score_cp,
+            mate_score=line.mate_score,
+            best_move=line.best_move,
+            pv=line.pv,
+            depth=line.depth,
+            nodes=line.nodes,
         )
+
+    def analyze_lines(self, position: Position, *, multipv: int = 3) -> tuple[EngineLine, ...]:
+        if multipv < 1:
+            raise ValueError("multipv must be at least 1")
+        self._ensure_started()
+        self._send(f"setoption name MultiPV value {multipv}")
+        self._send(f"position fen {position.fen}")
+        self._send(_go_command(self.depth, self.movetime_ms))
+        lines = self._read_until("bestmove", self.command_timeout)
+        red_to_move = position.side_to_move == "red"
+        return _parse_engine_lines(lines, red_to_move=red_to_move)
 
     def close(self) -> None:
         process = self._process
@@ -142,27 +155,52 @@ def _go_command(depth: int, movetime_ms: int | None) -> str:
     return f"go depth {depth}"
 
 
-def _parse_analysis_lines(lines: list[str]) -> tuple[int | None, int | None, str | None, list[str]]:
-    score_cp: int | None = None
-    mate_score: int | None = None
-    pv: list[str] = []
-    best_move: str | None = None
+def _parse_engine_lines(lines: list[str], *, red_to_move: bool) -> tuple[EngineLine, ...]:
+    parsed: dict[int, EngineLine] = {}
+    final_best_move: str | None = None
     for line in lines:
+        if line.startswith("bestmove"):
+            parts = line.split()
+            final_best_move = parts[1] if len(parts) > 1 and parts[1] != "(none)" else None
+            continue
         cp_match = SCORE_CP_RE.search(line)
         mate_match = SCORE_MATE_RE.search(line)
         pv_match = PV_RE.search(line)
-        if cp_match:
-            score_cp = int(cp_match.group(1))
-            mate_score = None
-        if mate_match:
-            mate_score = int(mate_match.group(1))
-            score_cp = None
-        if pv_match:
-            pv = pv_match.group(1).split()
-        if line.startswith("bestmove"):
-            parts = line.split()
-            best_move = parts[1] if len(parts) > 1 else None
-    return score_cp, mate_score, best_move, pv
+        if cp_match is None and mate_match is None:
+            continue
+        multipv_match = MULTIPV_RE.search(line)
+        depth_match = DEPTH_RE.search(line)
+        nodes_match = NODES_RE.search(line)
+        index = int(multipv_match.group(1)) if multipv_match else 1
+        pv = tuple(pv_match.group(1).split()) if pv_match else ()
+        parsed[index] = EngineLine(
+            multipv=index,
+            red_score_cp=(
+                _to_red_score(int(cp_match.group(1)), red_to_move) if cp_match else None
+            ),
+            mate_score=(
+                _to_red_score(int(mate_match.group(1)), red_to_move) if mate_match else None
+            ),
+            best_move=pv[0] if pv else None,
+            pv=pv,
+            depth=int(depth_match.group(1)) if depth_match else None,
+            nodes=int(nodes_match.group(1)) if nodes_match else None,
+        )
+
+    if 1 in parsed and final_best_move is not None:
+        first = parsed[1]
+        parsed[1] = EngineLine(
+            multipv=first.multipv,
+            red_score_cp=first.red_score_cp,
+            mate_score=first.mate_score,
+            best_move=final_best_move,
+            pv=first.pv,
+            depth=first.depth,
+            nodes=first.nodes,
+        )
+    if not parsed and final_best_move is not None:
+        parsed[1] = EngineLine(1, None, None, final_best_move)
+    return tuple(parsed[index] for index in sorted(parsed))
 
 
 def _to_red_score(score: int | None, red_to_move: bool) -> int | None:
