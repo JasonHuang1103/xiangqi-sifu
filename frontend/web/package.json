@@ -1,0 +1,28 @@
+{
+  "name": "xiangqi-sifu-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": ">=19.1.0 <20",
+    "react-dom": ">=19.1.0 <20"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": ">=6.6.0 <7",
+    "@testing-library/react": ">=16.3.0 <17",
+    "@testing-library/user-event": ">=14.6.0 <15",
+    "@types/react": ">=19.1.0 <20",
+    "@types/react-dom": ">=19.1.0 <20",
+    "@vitejs/plugin-react": ">=5.0.0 <6",
+    "jsdom": ">=26.1.0 <28",
+    "typescript": ">=5.8.0 <6",
+    "vite": ">=7.0.0 <8",
+    "vitest": ">=3.2.0 <5"
+  }
+}

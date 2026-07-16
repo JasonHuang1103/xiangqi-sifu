@@ -5,13 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "xiangqi-sifu"
 version = "0.1.0"
-description = "Phase 1 MVP for personal Xiangqi game review."
+description = "Local-first Xiangqi analysis, coaching, and play."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "numpy>=1.26", "Pillow>=10"]
+dev = ["pytest>=8", "httpx>=0.28", "numpy>=1.26", "Pillow>=10"]
+app = [
+    "fastapi>=0.116,<1",
+    "python-multipart>=0.0.20,<1",
+    "uvicorn[standard]>=0.35,<1",
+]
 frontend = ["streamlit>=1.30"]
 vision = ["numpy>=1.26", "Pillow>=10"]
 training = [
