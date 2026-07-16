@@ -1,9 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-function Bootstrap() {
-  return <main>Xiangqi Sifu</main>;
-}
+import { App } from "./app/App";
+import "./styles/app.css";
 
 const root = document.getElementById("root");
 
@@ -13,6 +12,6 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <Bootstrap />
+    <App />
   </StrictMode>,
 );
