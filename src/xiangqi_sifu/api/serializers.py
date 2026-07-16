@@ -29,6 +29,7 @@ def stored_game_dict(game: StoredGame) -> dict:
         "current_fen": game.current_fen,
         "human_side": game.human_side,
         "ai_level": game.ai_level,
+        "ai_adaptive": game.ai_adaptive,
         "red_name": game.red_name,
         "black_name": game.black_name,
         "result": game.result,

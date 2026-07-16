@@ -1,9 +1,13 @@
+import type { GameView } from "../app/types";
+
 type Activity = "friend" | "sifu" | "position" | "record" | "library";
 
 interface LaunchpadProps {
   onChoose: (activity: Activity) => void;
   busy?: boolean;
   error?: string | null;
+  savedGames?: GameView[];
+  onResume?: (game: GameView) => void;
 }
 
 const studyActions: Array<{ id: Activity; eyebrow: string; title: string; description: string }> = [
@@ -28,7 +32,7 @@ const studyActions: Array<{ id: Activity; eyebrow: string; title: string; descri
 ];
 
 
-export function Launchpad({ onChoose, busy = false, error = null }: LaunchpadProps) {
+export function Launchpad({ onChoose, busy = false, error = null, savedGames = [], onResume }: LaunchpadProps) {
   return (
     <main className="launchpad">
       <header className="launch-header">
@@ -82,6 +86,7 @@ export function Launchpad({ onChoose, busy = false, error = null }: LaunchpadPro
           ))}
         </div>
       </section>
+      {savedGames.length > 0 && <section className="launch-section sessions-section" aria-labelledby="sessions-title"><div className="section-heading"><div><p className="section-kicker">PERSONAL DATABASE</p><h2 id="sessions-title">Your recent games</h2></div><p>Saved separately from the tournament library. Active games can be continued exactly where you left them.</p></div><div className="session-list">{savedGames.slice(0, 6).map((game) => <button type="button" key={game.id} onClick={() => onResume?.(game)}><span><strong>{game.mode === "sifu" ? `Challenge Sifu · Level ${game.ai_level}` : `${game.red_name || "Red"} — ${game.black_name || "Black"}`}</strong><small>{game.moves.length} moves · {game.status === "active" ? "In progress" : `${game.result} · ${game.termination}`}</small></span><b>{game.status === "active" ? "Continue →" : "Open →"}</b></button>)}</div></section>}
       {busy && <p className="launch-notice" role="status">Preparing the board…</p>}
       {error && <p className="launch-error" role="alert">{error}</p>}
     </main>

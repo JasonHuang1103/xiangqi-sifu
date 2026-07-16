@@ -17,10 +17,15 @@ interface WorkspaceProps {
   selectedPly?: number;
   onNavigate?: (ply: number) => void;
   positions?: AnalyzedPosition[];
+  selectedSquare?: string | null;
+  legalTargets?: string[];
+  onSquareClick?: (square: string) => void;
+  toolbarActions?: { label: string; onClick: () => void; disabled?: boolean; active?: boolean }[];
+  notice?: string | null;
 }
 
 
-export function Workspace({ title, game, analysis = null, messages = [], onExit, onAsk, selectedPly = game.moves.length, onNavigate, positions }: WorkspaceProps) {
+export function Workspace({ title, game, analysis = null, messages = [], onExit, onAsk, selectedPly = game.moves.length, onNavigate, positions, selectedSquare, legalTargets = [], onSquareClick, toolbarActions = [], notice }: WorkspaceProps) {
   const [analysisVisible, setAnalysisVisible] = useState(Boolean(analysis));
   const [flipped, setFlipped] = useState(false);
   return (
@@ -36,9 +41,9 @@ export function Workspace({ title, game, analysis = null, messages = [], onExit,
           <p>LIBRARY</p><button type="button"><span>時</span>Sessions</button><button type="button"><span>書</span>Patterns</button>
         </nav>
         <section className="board-workspace">
-          <header className="board-heading"><div><p className="section-kicker">{game.mode === "friend" ? "FRIENDLY MATCH" : "POSITION ANALYSIS"}</p><h1>{title}</h1></div><div className="board-tools"><button type="button" onClick={() => setFlipped((value) => !value)}>Flip</button>{analysis && <button type="button" className={analysisVisible ? "active" : ""} onClick={() => setAnalysisVisible((value) => !value)}>{analysisVisible ? "Analysis on" : "Analysis off"}</button>}<button type="button">Edit</button><button type="button" onClick={onExit}>New</button></div></header>
+          <header className="board-heading"><div><p className="section-kicker">{game.mode === "friend" ? "FRIENDLY MATCH" : game.mode === "sifu" ? "CHALLENGE SIFU" : "POSITION ANALYSIS"}</p><h1>{title}</h1>{notice && <p className="board-notice" role="status">{notice}</p>}</div><div className="board-tools"><button type="button" onClick={() => setFlipped((value) => !value)}>Flip</button>{analysis && <button type="button" className={analysisVisible ? "active" : ""} onClick={() => setAnalysisVisible((value) => !value)}>{analysisVisible ? "Analysis on" : "Analysis off"}</button>}{toolbarActions.map((action) => <button type="button" key={action.label} onClick={action.onClick} disabled={action.disabled} className={action.active ? "active" : ""}>{action.label}</button>)}<button type="button" onClick={onExit}>New</button></div></header>
           {analysis && analysisVisible && <AnalysisRibbon analysis={analysis} />}
-          <div className="board-stage"><div className="turn-label"><span className={game.side_to_move} /> {game.side_to_move.toUpperCase()} TO MOVE</div><XiangqiBoard pieces={game.pieces} bestMove={analysis?.bestMove} showAnalysis={analysisVisible} flipped={flipped} /></div>
+          <div className="board-stage"><div className="turn-label"><span className={game.side_to_move} /> {game.status === "completed" ? `GAME OVER · ${game.result ?? "DRAW"}` : `${game.side_to_move.toUpperCase()} TO MOVE`}</div><XiangqiBoard pieces={game.pieces} bestMove={analysis?.bestMove} showAnalysis={analysisVisible} flipped={flipped} selectedSquare={selectedSquare} legalTargets={legalTargets} onSquareClick={onSquareClick} /></div>
           <div>{positions && positions.length > 1 && onNavigate && <EvaluationChart positions={positions} selectedPly={selectedPly} onSelect={onNavigate} />}<footer className="move-footer"><button type="button" aria-label="First move" onClick={() => onNavigate?.(0)} disabled={!onNavigate || selectedPly === 0}>|‹</button><button type="button" aria-label="Previous move" onClick={() => onNavigate?.(selectedPly - 1)} disabled={!onNavigate || selectedPly === 0}>‹</button><div className="move-track"><i style={{ width: `${game.moves.length ? Math.round(selectedPly / game.moves.length * 100) : 0}%` }} /></div><span>{selectedPly} / {game.moves.length} moves</span><button type="button" aria-label="Next move" onClick={() => onNavigate?.(selectedPly + 1)} disabled={!onNavigate || selectedPly >= game.moves.length}>›</button><button type="button" aria-label="Last move" onClick={() => onNavigate?.(game.moves.length)} disabled={!onNavigate || selectedPly >= game.moves.length}>›|</button></footer></div>
         </section>
         <CoachPanel messages={messages} onSend={onAsk} />

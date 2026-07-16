@@ -26,6 +26,7 @@ class StoredGame:
     current_fen: str
     human_side: str | None
     ai_level: int | None
+    ai_adaptive: bool
     red_name: str | None
     black_name: str | None
     result: str | None
@@ -67,6 +68,7 @@ class PersonalRepository:
         starting_fen: str = DEFAULT_START_FEN,
         human_side: str | None = None,
         ai_level: int | None = None,
+        ai_adaptive: bool = False,
         red_name: str | None = None,
         black_name: str | None = None,
     ) -> StoredGame:
@@ -75,9 +77,9 @@ class PersonalRepository:
             cursor = connection.execute(
                 """
                 INSERT INTO games (
-                    mode, starting_fen, current_fen, human_side, ai_level,
+                    mode, starting_fen, current_fen, human_side, ai_level, ai_adaptive,
                     red_name, black_name, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     mode,
@@ -85,6 +87,7 @@ class PersonalRepository:
                     starting_fen,
                     human_side,
                     ai_level,
+                    int(ai_adaptive),
                     red_name,
                     black_name,
                     now,
@@ -184,6 +187,11 @@ class PersonalRepository:
     def finish_game(self, game_id: int, *, result: str, termination: str) -> StoredGame:
         now = _timestamp()
         with self._connect() as connection:
+            existing = connection.execute(
+                "SELECT human_side, ai_adaptive FROM games WHERE id = ?", (game_id,)
+            ).fetchone()
+            if existing is None:
+                raise KeyError(f"Personal game not found: {game_id}")
             cursor = connection.execute(
                 """
                 UPDATE games
@@ -192,8 +200,6 @@ class PersonalRepository:
                 """,
                 (result, termination, now, game_id),
             )
-            if cursor.rowcount == 0:
-                raise KeyError(f"Personal game not found: {game_id}")
             connection.execute(
                 """
                 INSERT INTO game_events (game_id, event_type, payload_json, created_at)
@@ -201,7 +207,25 @@ class PersonalRepository:
                 """,
                 (game_id, json.dumps({"result": result, "termination": termination}), now),
             )
+            if existing["ai_adaptive"] and existing["human_side"] in {"w", "b"}:
+                human_won = (existing["human_side"] == "w" and result == "1-0") or (
+                    existing["human_side"] == "b" and result == "0-1"
+                )
+                human_lost = (existing["human_side"] == "w" and result == "0-1") or (
+                    existing["human_side"] == "b" and result == "1-0"
+                )
+                delta = 1 if human_won else -1 if human_lost else 0
+                if delta:
+                    current = self._adaptive_level(connection)
+                    connection.execute(
+                        "UPDATE profile SET adaptive_level = ?, updated_at = ? WHERE id = 1",
+                        (max(1, min(10, current + delta)), now),
+                    )
         return self.get_game(game_id)
+
+    def adaptive_level(self) -> int:
+        with self._connect() as connection:
+            return self._adaptive_level(connection)
 
     def get_game(self, game_id: int) -> StoredGame:
         with self._connect() as connection:
@@ -313,6 +337,7 @@ class PersonalRepository:
             current_fen=row["current_fen"],
             human_side=row["human_side"],
             ai_level=row["ai_level"],
+            ai_adaptive=bool(row["ai_adaptive"]),
             red_name=row["red_name"],
             black_name=row["black_name"],
             result=row["result"],
@@ -334,15 +359,32 @@ class PersonalRepository:
         schema = Path(__file__).with_name("personal_schema.sql").read_text(encoding="utf-8")
         with self._connect() as connection:
             version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-            if version > 2:
+            if version > 3:
                 raise RuntimeError(f"personal.db schema version {version} is newer than supported")
             if version == 0:
                 connection.executescript(schema)
-            elif version == 1:
-                connection.execute(
-                    "ALTER TABLE coach_threads ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'"
-                )
-                connection.execute("PRAGMA user_version = 2")
+            else:
+                if version == 1:
+                    connection.execute(
+                        "ALTER TABLE coach_threads ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'"
+                    )
+                    version = 2
+                if version == 2:
+                    connection.execute(
+                        "ALTER TABLE games ADD COLUMN ai_adaptive INTEGER NOT NULL DEFAULT 0 CHECK (ai_adaptive IN (0, 1))"
+                    )
+                    connection.execute("PRAGMA user_version = 3")
+            connection.execute(
+                "INSERT OR IGNORE INTO profile (id, adaptive_level, updated_at) VALUES (1, 5, ?)",
+                (_timestamp(),),
+            )
+
+    @staticmethod
+    def _adaptive_level(connection: sqlite3.Connection) -> int:
+        row = connection.execute(
+            "SELECT adaptive_level FROM profile WHERE id = 1"
+        ).fetchone()
+        return int(row[0]) if row is not None else 5
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)

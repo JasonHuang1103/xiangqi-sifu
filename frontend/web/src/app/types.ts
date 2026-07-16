@@ -15,6 +15,7 @@ export interface GameView {
   current_fen: string;
   human_side: "w" | "b" | null;
   ai_level: number | null;
+  ai_adaptive: boolean;
   red_name: string | null;
   black_name: string | null;
   result: string | null;

@@ -13,6 +13,7 @@ const game: GameView = {
   current_fen: "position",
   human_side: null,
   ai_level: null,
+  ai_adaptive: false,
   red_name: "Red",
   black_name: "Black",
   result: null,

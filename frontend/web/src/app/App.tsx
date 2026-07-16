@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { analyzePosition, askCoach, createCoachThread, createGame } from "./api";
+import { analyzeGame, analyzePosition, askCoach, createCoachThread, createGame, listPersonalGames } from "./api";
 import type { CoachMessage, GameView, StudySession } from "./types";
 import { Launchpad } from "../components/Launchpad";
 import { Workspace } from "../components/Workspace";
 import { LibraryFlow } from "../features/library/LibraryFlow";
 import { PositionFlow } from "../features/position/PositionFlow";
+import { NewGameDialog, type NewGameSettings } from "../features/play/NewGameDialog";
+import { PlayFlow } from "../features/play/PlayFlow";
 import { ReviewFlow } from "../features/review/ReviewFlow";
 import { sessionFromPositions } from "../features/study";
 
@@ -17,8 +19,13 @@ export function App() {
   const [study, setStudy] = useState<StudySession | null>(null);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [threadId, setThreadId] = useState<number | null>(null);
+  const [newGameMode, setNewGameMode] = useState<"friend" | "sifu" | null>(null);
+  const [savedGames, setSavedGames] = useState<GameView[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const refreshGames = () => listPersonalGames().then(setSavedGames).catch(() => undefined);
+  useEffect(() => { void refreshGames(); }, []);
 
   const choose = async (activity: "friend" | "sifu" | Intake) => {
     setError(null);
@@ -26,10 +33,15 @@ export function App() {
       setIntake(activity);
       return;
     }
+    setNewGameMode(activity);
+  };
+
+  const startGame = async (settings: NewGameSettings) => {
     setBusy(true);
     try {
-      const created = await createGame(activity === "friend" ? { mode: "friend" } : { mode: "sifu", human_side: "w", ai_level: 5 });
+      const created = await createGame(settings);
       setGame(created);
+      setNewGameMode(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The local service did not respond.");
     } finally {
@@ -49,6 +61,7 @@ export function App() {
     setIntake(null);
     setMessages([]);
     setThreadId(null);
+    void refreshGames();
   };
 
   const ask = async (question: string) => {
@@ -95,8 +108,22 @@ export function App() {
     }
   };
 
+  const reviewPlayedGame = async (played: GameView) => {
+    setBusy(true);
+    try {
+      const moves = played.moves.map((move) => move.uci);
+      const result = await analyzeGame(played.starting_fen, moves);
+      openStudy(sessionFromPositions(`${played.red_name || "Red"} — ${played.black_name || "Black"}`, "upload", result.positions, moves));
+      setGame(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The game could not be opened for review.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (game) {
-    return <Workspace title={game.mode === "friend" ? "Friendly Match" : "Challenge Sifu"} game={game} onExit={closeWorkspace} />;
+    return <PlayFlow initialGame={game} onExit={closeWorkspace} onReview={(played) => void reviewPlayedGame(played)} />;
   }
   if (study) return <Workspace title={study.title} game={study.game} analysis={study.analysis} messages={messages} onAsk={ask} onExit={closeWorkspace} selectedPly={study.selectedPly} onNavigate={(ply) => void navigateStudy(ply)} positions={study.positions} />;
   if (intake) {
@@ -104,5 +131,5 @@ export function App() {
     if (intake === "record") return <ReviewFlow onBack={() => setIntake(null)} onOpen={openStudy} />;
     return <LibraryFlow onBack={() => setIntake(null)} onOpen={openStudy} />;
   }
-  return <Launchpad onChoose={choose} busy={busy} error={error} />;
+  return <><Launchpad onChoose={choose} busy={busy} error={error} savedGames={savedGames} onResume={setGame} />{newGameMode && <NewGameDialog mode={newGameMode} busy={busy} onCancel={() => setNewGameMode(null)} onStart={(settings) => void startGame(settings)} />}</>;
 }

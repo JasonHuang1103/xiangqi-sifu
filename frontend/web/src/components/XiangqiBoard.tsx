@@ -58,6 +58,13 @@ export function XiangqiBoard({
         </g>
         <text className="river-label" x="105" y="226">楚 河</text>
         <text className="river-label" x="267" y="226">漢 界</text>
+        {Array.from({ length: 90 }, (_, index) => {
+          const file = index % 9;
+          const rank = Math.floor(index / 9);
+          const square = `${files[file]}${rank}`;
+          const position = point(square, flipped);
+          return <circle key={`hit-${square}`} data-testid={`square-${square}`} className="square-hit" cx={position.x} cy={position.y} r="19" onClick={() => onSquareClick?.(square)} />;
+        })}
         {legalTargets.map((square) => {
           const target = point(square, flipped);
           return <circle key={`target-${square}`} className="legal-target" cx={target.x} cy={target.y} r="7" />;
@@ -69,7 +76,7 @@ export function XiangqiBoard({
               key={square}
               className={`board-piece ${piece === piece.toUpperCase() ? "red-piece" : "black-piece"} ${selectedSquare === square ? "selected-piece" : ""}`}
               transform={`translate(${position.x} ${position.y})`}
-              onClick={() => onSquareClick?.(square)}
+              pointerEvents="none"
             >
               <circle r="17" />
               <text y="1">{glyphs[piece] ?? piece}</text>

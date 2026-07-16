@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS games (
     current_fen TEXT NOT NULL,
     human_side TEXT CHECK (human_side IN ('w', 'b')),
     ai_level INTEGER CHECK (ai_level BETWEEN 1 AND 10),
+    ai_adaptive INTEGER NOT NULL DEFAULT 0 CHECK (ai_adaptive IN (0, 1)),
     red_name TEXT,
     black_name TEXT,
     result TEXT,
@@ -98,4 +99,4 @@ CREATE TABLE IF NOT EXISTS recognitions (
     created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;

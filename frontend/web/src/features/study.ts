@@ -42,6 +42,7 @@ export function sessionFromPositions(title: string, source: StudySession["source
     current_fen: position.fen,
     human_side: null,
     ai_level: null,
+    ai_adaptive: false,
     red_name: null,
     black_name: null,
     result: null,

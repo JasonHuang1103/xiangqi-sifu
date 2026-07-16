@@ -20,6 +20,7 @@ export function createGame(input: {
   mode: "friend" | "sifu";
   human_side?: "w" | "b";
   ai_level?: number;
+  adaptive?: boolean;
   red_name?: string;
   black_name?: string;
 }): Promise<GameView> {
@@ -40,6 +41,18 @@ export function playMove(gameId: number, uci: string): Promise<GameView> {
 
 export function requestAiMove(gameId: number): Promise<GameView> {
   return request<GameView>(`/api/play/games/${gameId}/ai-move`, { method: "POST" });
+}
+
+export function undoGame(gameId: number): Promise<GameView> {
+  return request<GameView>(`/api/play/games/${gameId}/undo`, { method: "POST" });
+}
+
+export function resignGame(gameId: number, side?: "w" | "b"): Promise<GameView> {
+  return request<GameView>(`/api/play/games/${gameId}/resign`, { method: "POST", body: JSON.stringify({ side }) });
+}
+
+export function listPersonalGames(): Promise<GameView[]> {
+  return request<GameView[]>("/api/personal/games");
 }
 
 export interface PositionValidation {

@@ -38,12 +38,17 @@ class NewGameRequest(BaseModel):
     mode: Literal["friend", "sifu"]
     human_side: Literal["w", "b"] | None = None
     ai_level: int | None = Field(default=None, ge=1, le=10)
+    adaptive: bool = False
     red_name: str | None = None
     black_name: str | None = None
 
 
 class MoveRequest(BaseModel):
     uci: str
+
+
+class ResignRequest(BaseModel):
+    side: Literal["w", "b"] | None = None
 
 
 class CoachThreadRequest(BaseModel):
