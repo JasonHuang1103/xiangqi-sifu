@@ -35,6 +35,25 @@ class StoredGame:
     moves: tuple[StoredMove, ...]
 
 
+@dataclass(frozen=True)
+class StoredCoachMessage:
+    id: int
+    role: str
+    content: str
+    provider: str | None
+    created_at: str
+
+
+@dataclass(frozen=True)
+class StoredCoachThread:
+    id: int
+    game_id: int | None
+    context_fen: str
+    context: dict
+    selected_ply: int | None
+    messages: tuple[StoredCoachMessage, ...]
+
+
 class PersonalRepository:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -201,6 +220,82 @@ class PersonalRepository:
             ).fetchall()
             return [self._stored_game(connection, row) for row in rows]
 
+    def create_coach_thread(
+        self,
+        *,
+        context_fen: str,
+        context: dict,
+        game_id: int | None = None,
+        selected_ply: int | None = None,
+    ) -> StoredCoachThread:
+        now = _timestamp()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO coach_threads (
+                    game_id, context_fen, context_json, selected_ply, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (game_id, context_fen, json.dumps(context), selected_ply, now, now),
+            )
+            thread_id = int(cursor.lastrowid)
+        return self.get_coach_thread(thread_id)
+
+    def append_coach_message(
+        self,
+        thread_id: int,
+        *,
+        role: str,
+        content: str,
+        provider: str | None = None,
+    ) -> StoredCoachThread:
+        now = _timestamp()
+        with self._connect() as connection:
+            if connection.execute(
+                "SELECT 1 FROM coach_threads WHERE id = ?", (thread_id,)
+            ).fetchone() is None:
+                raise KeyError(f"Coach thread not found: {thread_id}")
+            connection.execute(
+                """
+                INSERT INTO coach_messages (thread_id, role, content, provider, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (thread_id, role, content, provider, now),
+            )
+            connection.execute(
+                "UPDATE coach_threads SET updated_at = ? WHERE id = ?", (now, thread_id)
+            )
+        return self.get_coach_thread(thread_id)
+
+    def get_coach_thread(self, thread_id: int) -> StoredCoachThread:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM coach_threads WHERE id = ?", (thread_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Coach thread not found: {thread_id}")
+            messages = connection.execute(
+                "SELECT * FROM coach_messages WHERE thread_id = ? ORDER BY id",
+                (thread_id,),
+            ).fetchall()
+        return StoredCoachThread(
+            id=row["id"],
+            game_id=row["game_id"],
+            context_fen=row["context_fen"],
+            context=json.loads(row["context_json"]),
+            selected_ply=row["selected_ply"],
+            messages=tuple(
+                StoredCoachMessage(
+                    id=message["id"],
+                    role=message["role"],
+                    content=message["content"],
+                    provider=message["provider"],
+                    created_at=message["created_at"],
+                )
+                for message in messages
+            ),
+        )
+
     def _stored_game(self, connection: sqlite3.Connection, row: sqlite3.Row) -> StoredGame:
         move_rows = connection.execute(
             """
@@ -239,10 +334,15 @@ class PersonalRepository:
         schema = Path(__file__).with_name("personal_schema.sql").read_text(encoding="utf-8")
         with self._connect() as connection:
             version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-            if version > 1:
+            if version > 2:
                 raise RuntimeError(f"personal.db schema version {version} is newer than supported")
             if version == 0:
                 connection.executescript(schema)
+            elif version == 1:
+                connection.execute(
+                    "ALTER TABLE coach_threads ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'"
+                )
+                connection.execute("PRAGMA user_version = 2")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)

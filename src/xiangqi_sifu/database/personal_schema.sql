@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS coach_threads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id INTEGER REFERENCES games(id) ON DELETE CASCADE,
     context_fen TEXT NOT NULL,
+    context_json TEXT NOT NULL DEFAULT '{}',
     selected_ply INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -97,4 +98,4 @@ CREATE TABLE IF NOT EXISTS recognitions (
     created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
