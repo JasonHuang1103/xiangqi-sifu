@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from xiangqi_sifu.api.dependencies import Services
 from xiangqi_sifu.api.models import HealthResponse
@@ -24,6 +25,7 @@ def create_app(
     data_dir: str | Path = "data/processed",
     engine_path: str | Path | None = None,
     reference_path: str | Path | None = None,
+    frontend_dir: str | Path | None = None,
     engine: Any | None = None,
 ) -> FastAPI:
     storage = Path(data_dir)
@@ -67,6 +69,11 @@ def create_app(
     application.include_router(play_router)
     application.include_router(coach_router)
     application.include_router(library_router)
+    if frontend_dir is not None:
+        built_client = Path(frontend_dir)
+        if not (built_client / "index.html").is_file():
+            raise FileNotFoundError(f"Built web client not found: {built_client}")
+        application.mount("/", StaticFiles(directory=built_client, html=True), name="web")
     return application
 
 
