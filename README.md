@@ -4,6 +4,8 @@ Xiangqi Sifu is a fully local-first Xiangqi desktop-style web app. It combines a
 
 No account or network service is required during normal use. Personal games are saved only on the local machine.
 
+See [`PROGRESS.md`](PROGRESS.md) for the current project status, durable decisions, known limitations, verification baseline, and chronological development history.
+
 ## What is included
 
 - **Play a Friend** — a same-device match with legal-move highlighting, autosave, undo, resign, resume, and post-game review.
